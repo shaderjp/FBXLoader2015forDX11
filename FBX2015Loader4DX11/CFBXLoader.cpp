@@ -376,7 +376,7 @@ void CFBXLoader::ComputeNodeMatrix(FbxNode* pNode, FBX_MESH_NODE* meshNode)
 		return ;
 	}
 
-	FbxAnimEvaluator* lEvaluator = mScene->GetEvaluator();
+	FbxAnimEvaluator* lEvaluator = mScene->GetAnimationEvaluator();
 	FbxMatrix lGlobal;
 	lGlobal.SetIdentity();
 
