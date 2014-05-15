@@ -697,7 +697,7 @@ Alpha blending:
     which can be used to draw all opaque parts of all meshes first, then go back and draw all alpha parts of
     all meshes second.
 
-    To indicate the use of ëstraightí alpha vs. ëpremultipliedí alpha blending modes, ModelMesh::pmalpha is set by
+    To indicate the use of ëstraightÅEalpha vs. ëpremultipliedÅEalpha blending modes, ModelMesh::pmalpha is set by
     the various loaders functions controlled by a default parameter (which defaults false to indicate the
     texture files are using 'straight' alpha). If you make use of DirectXTex's texconv tool with the -pmalpha 
     switch, you should use pmalpha=true instead.
@@ -720,14 +720,14 @@ Coordinate systems:
     convenience, but it impacts how the models are built and/or exported.
 
     The Visual Studio 3D Starter Kitís .CMO files assume the developer is using right-handed coordinates. DirectXTKís default
-    parameters assume you are using right-handed coordinates as well, so the ëccwí parameter defaults to true. If using a .CMO
-    with left-handed coordinates, you should pass false for the ëccwí parameter which will use clockwise winding instead.
-    This makes the geometry visible, but could make textures on the model appear ëflippedí in U.
+    parameters assume you are using right-handed coordinates as well, so the ëccwÅEparameter defaults to true. If using a .CMO
+    with left-handed coordinates, you should pass false for the ëccwÅEparameter which will use clockwise winding instead.
+    This makes the geometry visible, but could make textures on the model appear ëflippedÅEin U.
  
     The legacy DirectX SDKís .SDKMESH files assume the developer is using left-handed coordinates. DirectXTKís default parameters
-    assume you are using right-handed coordinates, so the ëccwí parameter defaults to false which will use clockwise winding
-    and potentially have the ëflipped in Uí texture problem. If using a .SDKMESH with left-handed coordinates, you should pass
-    true for the ëccwí parameter.
+    assume you are using right-handed coordinates, so the ëccwÅEparameter defaults to false which will use clockwise winding
+    and potentially have the ëflipped in UÅEtexture problem. If using a .SDKMESH with left-handed coordinates, you should pass
+    true for the ëccwÅEparameter.
 
 Feature Level Notes:
 
@@ -743,8 +743,8 @@ Feature Level Notes:
 
 Threading model:
 
-    The ModelMeshPart is tied to a device, but not a device context. This means that Model creation/loading is ëfree threadedí.
-    Drawing can be done on the immediate context or by a deferred context, but keep in mind device contexts are not ëfree threadedí.
+    The ModelMeshPart is tied to a device, but not a device context. This means that Model creation/loading is ëfree threadedÅE
+    Drawing can be done on the immediate context or by a deferred context, but keep in mind device contexts are not ëfree threadedÅE
 
 
 
