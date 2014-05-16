@@ -14,3 +14,5 @@ FBXを読み込んでDirect3D11で描画するサンプルです。
 	- http://usa.autodesk.com/adsk/servlet/pc/item?siteID=123112&id=10775847
 - DirectXTKを使用しています。
 	- http://directxtk.codeplex.com/
+- FBX SDK 2014とVisual Studio 2012対応はこちら
+	- https://github.com/shaderjp/FBXLoader
