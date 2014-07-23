@@ -42,6 +42,9 @@ XMMATRIX                            g_View;
 XMMATRIX                            g_Projection;
 XMFLOAT4                            g_vMeshColor(0.7f, 0.7f, 0.7f, 1.0f);
 
+// グラフィックス診断用
+ID3DUserDefinedAnnotation*			g_pUserAnotation = nullptr;
+
 
 //--------------------------------------------------------------------------------------
 // Forward declarations
@@ -265,6 +268,9 @@ HRESULT InitDevice()
 	}
 	if (FAILED(hr))
 		return hr;
+
+	//
+	g_pImmediateContext->QueryInterface( __uuidof(ID3DUserDefinedAnnotation), (void**)&g_pUserAnotation);
 
 	// Create a render target view
 	ID3D11Texture2D* pBackBuffer = NULL;
@@ -515,6 +521,12 @@ HRESULT SetupTransformSRV()
 //
 void CleanupApp()
 {
+	if (g_pUserAnotation)
+	{
+		g_pUserAnotation->Release();
+		g_pUserAnotation = nullptr;
+	}
+
 	if (g_pSpriteBatch)
 	{
 		delete g_pSpriteBatch;
@@ -709,12 +721,18 @@ void Render()
 	g_pImmediateContext->RSSetState(g_pRS);
 	g_pImmediateContext->OMSetBlendState(g_pBlendState, blendFactors, 0xffffffff);
 	g_pImmediateContext->OMSetDepthStencilState(g_pDepthStencilState, 0);
-
+	
+	g_pUserAnotation->BeginEvent(L"ModelDraw");
+	
 	// モデルを順番に描画
 	for (DWORD i = 0; i<NUMBER_OF_MODELS; i++)
 	{
 		// FBX Modelのnode数を取得
 		size_t nodeCount = g_pFbxDX11[i]->GetNodeCount();
+
+		WCHAR wstr[256];
+		swprintf_s(wstr, L"Model0%d", i);
+		g_pUserAnotation->BeginEvent(wstr);
 
 		ID3D11VertexShader* pVS = g_bInstancing ? g_pvsFBXInstancing : g_pvsFBX;
 		g_pImmediateContext->VSSetShader(pVS, NULL, 0);
@@ -758,8 +776,16 @@ void Render()
 				g_pFbxDX11[i]->RenderNodeInstancing(g_pImmediateContext, j, g_InstanceMAX);
 			else
 				g_pFbxDX11[i]->RenderNode(g_pImmediateContext, j);
+
+			
 		}
+
+		g_pUserAnotation->EndEvent();
 	}
+
+	g_pUserAnotation->EndEvent();
+
+	g_pUserAnotation->BeginEvent(L"RenderText");
 
 	// Text
 	WCHAR wstr[512];
@@ -770,9 +796,10 @@ void Render()
 		swprintf_s(wstr, L"Render Mode: Instancing");
 	else
 		swprintf_s(wstr, L"Render Mode: Single Draw");
-
 	g_pFont->DrawString(g_pSpriteBatch, wstr, XMFLOAT2(0, 16), DirectX::Colors::Yellow, 0, XMFLOAT2(0, 0), 0.5f);
 	g_pSpriteBatch->End();
+	
+	g_pUserAnotation->EndEvent();
 
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
