@@ -156,12 +156,14 @@ class CFBXRenderDX11
 	
 	std::vector<MESH_NODE>	m_meshNodeArray;
 
-	HRESULT CreateNodes(ID3D11Device*	pd3dDevice);
+	HRESULT CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext);
 	HRESULT VertexConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode);
 	HRESULT MaterialConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode,  MESH_NODE& meshNode);
 
 	HRESULT CreateVertexBuffer( ID3D11Device*	pd3dDevice, ID3D11Buffer** pBuffer, void* pVertices, uint32_t stride, uint32_t vertexCount );
 	HRESULT CreateIndexBuffer( ID3D11Device*	pd3dDevice, ID3D11Buffer** pBuffer, void* pIndices, uint32_t indexCount );
+
+	HRESULT Optimization(ID3D11DeviceContext*	pd3dContext, FBX_MESH_NODE& fbxNode, MESH_NODE& meshNode);
 
 public:
 	CFBXRenderDX11();
@@ -169,7 +171,7 @@ public:
 
 	void Release();
 
-	HRESULT LoadFBX(const char* filename, ID3D11Device*	pd3dDevice);
+	HRESULT LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext);
 	HRESULT CreateInputLayout(ID3D11Device*	pd3dDevice, const void* pShaderBytecodeWithInputSignature, size_t BytecodeLength, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int layoutSize);
 
 	HRESULT RenderAll( ID3D11DeviceContext* pImmediateContext);

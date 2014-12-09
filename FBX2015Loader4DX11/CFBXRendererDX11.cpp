@@ -12,6 +12,7 @@
 #include "CFBXRendererDX11.h"
 #include "DDSTextureLoader.h"
 #include < locale.h >
+#include <DirectXMesh.h>
 
 namespace FBX_LOADER
 {
@@ -41,7 +42,7 @@ void CFBXRenderDX11::Release()
 	}
 }
 
-HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice)
+HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext)
 {
 	if(!filename || !pd3dDevice)
 		return E_FAIL;
@@ -53,7 +54,7 @@ HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice)
 	if(FAILED(hr))
 		return hr;
 
-	hr = CreateNodes(pd3dDevice);
+	hr = CreateNodes(pd3dDevice, pd3dContext);
 	if(FAILED(hr))
 		return hr;
 
@@ -61,7 +62,7 @@ HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice)
 }
 
 //
-HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice)
+HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext)
 {
 	if(!pd3dDevice)
 		return E_FAIL;
@@ -85,6 +86,9 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice)
 		if(fbxNode.indexArray.size() > 0)
 			hr = CreateIndexBuffer(pd3dDevice, &meshNode.m_pIB, &fbxNode.indexArray[0], static_cast<uint32_t>(fbxNode.indexArray.size()));
 
+		// Index最適化
+		Optimization(pd3dContext, fbxNode, meshNode);
+
 		memcpy( meshNode.mat4x4, fbxNode.mat4x4,sizeof(float)*16 );
 
 		// マテリアル
@@ -92,7 +96,8 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice)
 
 		m_meshNodeArray.push_back(meshNode);
 	}
-
+	
+	
 	return hr;
 }
 
@@ -131,10 +136,10 @@ HRESULT CFBXRenderDX11::CreateIndexBuffer(  ID3D11Device*	pd3dDevice, ID3D11Buff
 		
 	D3D11_BUFFER_DESC bd;
     ZeroMemory( &bd, sizeof(bd) );
-    bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.Usage = D3D11_USAGE_DYNAMIC;
     bd.ByteWidth = static_cast<uint32_t>(stride*indexCount);
     bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    bd.CPUAccessFlags = 0;
+	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     D3D11_SUBRESOURCE_DATA InitData;
     ZeroMemory( &InitData, sizeof(InitData) );
  
@@ -143,6 +148,26 @@ HRESULT CFBXRenderDX11::CreateIndexBuffer(  ID3D11Device*	pd3dDevice, ID3D11Buff
 	hr = pd3dDevice->CreateBuffer( &bd, &InitData, pBuffer );
     if( FAILED( hr ) )
         return hr;
+
+	return hr;
+}
+
+HRESULT CFBXRenderDX11::Optimization(ID3D11DeviceContext*	pd3dContext, FBX_MESH_NODE& fbxNode, MESH_NODE& meshNode)
+{
+	HRESULT hr = S_OK;
+
+	if (meshNode.m_pIB==nullptr)
+		return S_OK;
+
+	uint32_t* pOutput = new uint32_t[meshNode.indexCount];
+	D3D11_MAPPED_SUBRESOURCE oRes;
+	hr = pd3dContext->Map(meshNode.m_pIB, 0, D3D11_MAP_WRITE_DISCARD, 0, &oRes);
+	if (FAILED(hr))
+		return hr;
+	DirectX::OptimizeVertices(static_cast<uint32_t*>(&fbxNode.indexArray[0]), meshNode.indexCount / 3, meshNode.vertexCount, pOutput);
+
+	memcpy(oRes.pData, pOutput, sizeof(uint32_t)*meshNode.indexCount);
+	pd3dContext->Unmap(meshNode.m_pIB, 0);
 
 	return hr;
 }
@@ -260,8 +285,7 @@ HRESULT CFBXRenderDX11::MaterialConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_N
 	meshNode.materialData.materialConstantData.diffuse = meshNode.materialData.ambient;
 	meshNode.materialData.materialConstantData.specular = meshNode.materialData.specular;
 	meshNode.materialData.materialConstantData.emmisive = meshNode.materialData.emmisive;
-
-	
+		
 	return hr;
 }
 
@@ -274,11 +298,9 @@ HRESULT CFBXRenderDX11::CreateInputLayout(ID3D11Device*	pd3dDevice, const void* 
 
 	HRESULT hr = S_OK;
 
-	size_t nodeCount = m_meshNodeArray.size();
-
-	for(size_t i=0;i<nodeCount;i++)
+	for (auto meshNode = m_meshNodeArray.begin(); meshNode != m_meshNodeArray.end();++meshNode)
 	{
-		pd3dDevice->CreateInputLayout( pLayout, layoutSize, pShaderBytecodeWithInputSignature, BytecodeLength,&m_meshNodeArray[i].m_pInputLayout);
+		hr = pd3dDevice->CreateInputLayout(pLayout, layoutSize, pShaderBytecodeWithInputSignature, BytecodeLength, &meshNode->m_pInputLayout);
 	}
 
 	return hr;
@@ -293,26 +315,24 @@ HRESULT CFBXRenderDX11::RenderAll( ID3D11DeviceContext* pImmediateContext)
 	HRESULT hr = S_OK;
 
 	pImmediateContext->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-	
-	for(size_t i=0;i<nodeCount;i++)
-	{
-		MESH_NODE* node = &m_meshNodeArray[i];
 
-		if(node->vertexCount==0)
+	for (auto meshNode = m_meshNodeArray.begin(); meshNode != m_meshNodeArray.end(); ++meshNode)
+	{
+		if (meshNode->vertexCount == 0)
 			continue;
 
-	    UINT stride = sizeof( VERTEX_DATA );
-	    UINT offset = 0;
-		pImmediateContext->IASetVertexBuffers( 0, 1, &node->m_pVB, &stride, &offset );
+		UINT stride = sizeof(VERTEX_DATA);
+		UINT offset = 0;
+		pImmediateContext->IASetVertexBuffers(0, 1, &meshNode->m_pVB, &stride, &offset);
 
 		DXGI_FORMAT indexbit = DXGI_FORMAT_R16_UINT;
-		if(node->m_indexBit==MESH_NODE::INDEX_32BIT)
+		if (meshNode->m_indexBit == MESH_NODE::INDEX_32BIT)
 			indexbit = DXGI_FORMAT_R32_UINT;
-		
-		pImmediateContext->IASetInputLayout(node->m_pInputLayout);
-		pImmediateContext->IASetIndexBuffer(node->m_pIB,indexbit,0);
 
-		pImmediateContext->DrawIndexed(node->indexCount, 0, 0);
+		pImmediateContext->IASetInputLayout(meshNode->m_pInputLayout);
+		pImmediateContext->IASetIndexBuffer(meshNode->m_pIB, indexbit, 0);
+
+		pImmediateContext->DrawIndexed(meshNode->indexCount, 0, 0);
 	}
 
 	return hr;

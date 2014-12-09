@@ -356,7 +356,7 @@ HRESULT InitApp()
 	for (DWORD i = 0; i<NUMBER_OF_MODELS; i++)
 	{
 		g_pFbxDX11[i] = new FBX_LOADER::CFBXRenderDX11;
-		hr = g_pFbxDX11[i]->LoadFBX(g_files[i], g_pd3dDevice);
+		hr = g_pFbxDX11[i]->LoadFBX(g_files[i], g_pd3dDevice, g_pImmediateContext);
 	}
 	if (FAILED(hr))
 	{
@@ -740,7 +740,7 @@ void Render()
 		g_pImmediateContext->PSSetShader(g_ppsFBX, NULL, 0);
 
 		// ‘Sƒm[ƒh‚ð•`‰æ
-		for (size_t j = 0; j<nodeCount; j++)
+		for (int j = 0; j<nodeCount; j++)
 		{
 
 			XMMATRIX mLocal;
