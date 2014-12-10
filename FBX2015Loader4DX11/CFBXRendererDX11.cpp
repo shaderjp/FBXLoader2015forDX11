@@ -42,7 +42,7 @@ void CFBXRenderDX11::Release()
 	}
 }
 
-HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext)
+HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext, const bool isOptimize)
 {
 	if(!filename || !pd3dDevice)
 		return E_FAIL;
@@ -54,7 +54,7 @@ HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, 
 	if(FAILED(hr))
 		return hr;
 
-	hr = CreateNodes(pd3dDevice, pd3dContext);
+	hr = CreateNodes(pd3dDevice, pd3dContext, isOptimize);
 	if(FAILED(hr))
 		return hr;
 
@@ -62,7 +62,7 @@ HRESULT CFBXRenderDX11::LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, 
 }
 
 //
-HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext)
+HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext, const bool isOptimize)
 {
 	if(!pd3dDevice)
 		return E_FAIL;
@@ -77,19 +77,23 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContex
 	{
 		MESH_NODE meshNode;
 		FBX_MESH_NODE fbxNode = m_pFBX->GetNode(static_cast<unsigned int>(i));
-#ifdef MESH_OPTIMIZE
-		// 最適化
-		VertexConstructionWithOptimize(pd3dDevice, pd3dContext, fbxNode, meshNode);
-#else
-		// 最適化なし
-		VertexConstruction(pd3dDevice, fbxNode, meshNode);
 
-		// index buffer
-		meshNode.indexCount = static_cast<DWORD>(fbxNode.indexArray.size());
-		meshNode.SetIndexBit(meshNode.indexCount);
-		if(fbxNode.indexArray.size() > 0)
-			hr = CreateIndexBuffer(pd3dDevice, &meshNode.m_pIB, &fbxNode.indexArray[0], static_cast<uint32_t>(fbxNode.indexArray.size()));
-#endif
+		if (isOptimize)
+		{
+			// 最適化あり
+			VertexConstructionWithOptimize(pd3dDevice, pd3dContext, fbxNode, meshNode);
+		}
+		else
+		{
+			// 最適化なし
+			VertexConstruction(pd3dDevice, fbxNode, meshNode);
+
+			// index buffer
+			meshNode.indexCount = static_cast<DWORD>(fbxNode.indexArray.size());
+			meshNode.SetIndexBit(meshNode.indexCount);
+			if (fbxNode.indexArray.size() > 0)
+				hr = CreateIndexBuffer(pd3dDevice, &meshNode.m_pIB, &fbxNode.indexArray[0], static_cast<uint32_t>(fbxNode.indexArray.size()));
+		}
 
 		memcpy( meshNode.mat4x4, fbxNode.mat4x4,sizeof(float)*16 );
 

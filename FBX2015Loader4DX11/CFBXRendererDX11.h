@@ -17,9 +17,6 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 
-// 最適化フラグ（不要な場合はコメントアウト）
-#define MESH_OPTIMIZE
-
 namespace FBX_LOADER
 {
 
@@ -159,7 +156,7 @@ class CFBXRenderDX11
 	
 	std::vector<MESH_NODE>	m_meshNodeArray;
 
-	HRESULT CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext);
+	HRESULT CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext, const bool isOptimize);
 	HRESULT VertexConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode);
 	HRESULT VertexConstructionWithOptimize(ID3D11Device*	pd3dDevice, ID3D11DeviceContext* pContext, FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode);
 	HRESULT MaterialConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode,  MESH_NODE& meshNode);
@@ -173,7 +170,7 @@ public:
 
 	void Release();
 
-	HRESULT LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext);
+	HRESULT LoadFBX(const char* filename, ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext, const bool isOptimize = true);
 	HRESULT CreateInputLayout(ID3D11Device*	pd3dDevice, const void* pShaderBytecodeWithInputSignature, size_t BytecodeLength, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int layoutSize);
 
 	HRESULT RenderAll( ID3D11DeviceContext* pImmediateContext);
