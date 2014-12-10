@@ -703,9 +703,7 @@ void Render()
 			dwTimeStart = dwTimeCur;
 		t = (dwTimeCur - dwTimeStart) / 1000.0f;
 	}
-
-	t = 0;
-
+	
 	// Rotate cube around the origin
 	g_World = XMMatrixRotationY(t);
 
