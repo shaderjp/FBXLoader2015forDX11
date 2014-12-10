@@ -17,6 +17,9 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 
+// 最適化フラグ（不要な場合はコメントアウト）
+#define MESH_OPTIMIZE
+
 namespace FBX_LOADER
 {
 
@@ -158,12 +161,11 @@ class CFBXRenderDX11
 
 	HRESULT CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContext*	pd3dContext);
 	HRESULT VertexConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode);
+	HRESULT VertexConstructionWithOptimize(ID3D11Device*	pd3dDevice, ID3D11DeviceContext* pContext, FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode);
 	HRESULT MaterialConstruction(ID3D11Device*	pd3dDevice,FBX_MESH_NODE &fbxNode,  MESH_NODE& meshNode);
 
 	HRESULT CreateVertexBuffer( ID3D11Device*	pd3dDevice, ID3D11Buffer** pBuffer, void* pVertices, uint32_t stride, uint32_t vertexCount );
 	HRESULT CreateIndexBuffer( ID3D11Device*	pd3dDevice, ID3D11Buffer** pBuffer, void* pIndices, uint32_t indexCount );
-
-	HRESULT Optimization(ID3D11DeviceContext*	pd3dContext, FBX_MESH_NODE& fbxNode, MESH_NODE& meshNode);
 
 public:
 	CFBXRenderDX11();

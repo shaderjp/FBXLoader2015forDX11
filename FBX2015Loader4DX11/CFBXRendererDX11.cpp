@@ -77,7 +77,11 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContex
 	{
 		MESH_NODE meshNode;
 		FBX_MESH_NODE fbxNode = m_pFBX->GetNode(static_cast<unsigned int>(i));
-		
+#ifdef MESH_OPTIMIZE
+		// 最適化
+		VertexConstructionWithOptimize(pd3dDevice, pd3dContext, fbxNode, meshNode);
+#else
+		// 最適化なし
 		VertexConstruction(pd3dDevice, fbxNode, meshNode);
 
 		// index buffer
@@ -85,9 +89,7 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContex
 		meshNode.SetIndexBit(meshNode.indexCount);
 		if(fbxNode.indexArray.size() > 0)
 			hr = CreateIndexBuffer(pd3dDevice, &meshNode.m_pIB, &fbxNode.indexArray[0], static_cast<uint32_t>(fbxNode.indexArray.size()));
-
-		// Index最適化
-		Optimization(pd3dContext, fbxNode, meshNode);
+#endif
 
 		memcpy( meshNode.mat4x4, fbxNode.mat4x4,sizeof(float)*16 );
 
@@ -99,6 +101,125 @@ HRESULT CFBXRenderDX11::CreateNodes(ID3D11Device*	pd3dDevice, ID3D11DeviceContex
 	
 	
 	return hr;
+}
+
+HRESULT CFBXRenderDX11::VertexConstructionWithOptimize(ID3D11Device*	pd3dDevice, ID3D11DeviceContext* pContext, FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode)
+{
+	HRESULT hr = S_OK;
+	size_t nFaces = fbxNode.indexArray.size() / 3;
+	size_t nVerts = fbxNode.m_positionArray.size();
+
+	if (nFaces == 0 || nVerts==0)
+		return S_OK;
+
+	VERTEX_DATA*	pIn = new VERTEX_DATA[nVerts];
+
+	meshNode.vertexCount = static_cast<DWORD>(nVerts);
+	for (size_t i = 0; i<meshNode.vertexCount; i++)
+	{
+		FbxVector4 v = fbxNode.m_positionArray[i];
+		pIn[i].vPos = DirectX::XMFLOAT3((float) v.mData[0],
+			(float) v.mData[1],
+			(float) v.mData[2]);
+
+		v = fbxNode.m_normalArray[i];
+
+		pIn[i].vNor = DirectX::XMFLOAT3((float) v.mData[0],
+			(float) v.mData[1],
+			(float) v.mData[2]);
+
+		if ((float) fbxNode.m_texcoordArray.size() > 0)
+		{
+			// 今回はUV1つしかやらない
+			// UVのV値反転
+			pIn[i].vTexcoord = DirectX::XMFLOAT2((float) abs(1.0f - fbxNode.m_texcoordArray[i].mData[0]),
+				(float) abs(1.0f - fbxNode.m_texcoordArray[i].mData[1]));
+		}
+		else
+			pIn[i].vTexcoord = DirectX::XMFLOAT2(0, 0);
+	}
+
+	// 最適化
+	uint32_t* indecies = new uint32_t[fbxNode.indexArray.size()];
+	if (fbxNode.indexArray.size() > 0)
+	{
+		memcpy(indecies, &fbxNode.indexArray.front(), sizeof(uint32_t)*fbxNode.indexArray.size());
+	}
+	DirectX::XMFLOAT3* pos = new DirectX::XMFLOAT3[nVerts];
+	for (size_t j = 0; j < nVerts; ++j)
+		pos[j] = DirectX::XMFLOAT3(static_cast<float>(fbxNode.m_positionArray[j].mData[0]), static_cast<float>(fbxNode.m_positionArray[j].mData[1]), static_cast<float>(fbxNode.m_positionArray[j].mData[2]));
+
+	uint32_t* adj = new uint32_t[fbxNode.indexArray.size()];
+
+	hr = DirectX::GenerateAdjacencyAndPointReps(indecies, nFaces, pos, nVerts, 0.f, nullptr, adj);
+	if (FAILED(hr))
+	{
+		delete indecies;
+
+		delete adj;
+		return hr;
+	}
+
+	uint32_t* faceRemap = new uint32_t[nFaces];
+	hr = DirectX::OptimizeFaces(indecies, nFaces, adj, faceRemap);
+	if (FAILED(hr))
+	{
+		delete indecies;
+
+		delete adj;
+		delete faceRemap;
+		return hr;
+	}
+
+	uint32_t* newIndices = new uint32_t[nFaces*3];
+	hr = DirectX::ReorderIB(indecies, nFaces, faceRemap, newIndices);
+	if (FAILED(hr))
+	{
+		delete indecies;
+
+		delete adj;
+		delete faceRemap;
+		delete newIndices;
+		return hr;
+	}
+
+	uint32_t* vertRemap = new uint32_t[nVerts];
+	hr = DirectX::OptimizeVertices(newIndices, nFaces, nVerts, vertRemap);
+	if (FAILED(hr))
+	{
+		delete indecies;
+
+		delete adj;
+		delete faceRemap;
+		delete newIndices;
+		delete vertRemap;
+		return hr;
+	}
+	
+	hr = DirectX::FinalizeIB(newIndices, nFaces, vertRemap, nVerts);
+	if (FAILED(hr))
+		return hr;
+
+	VERTEX_DATA*	pOut = new VERTEX_DATA[nVerts];
+
+	hr = DirectX::FinalizeVB(pIn, sizeof(VERTEX_DATA), nVerts, nullptr, 0, vertRemap, pOut);
+
+	CreateVertexBuffer(pd3dDevice, &meshNode.m_pVB, pOut, sizeof(VERTEX_DATA), meshNode.vertexCount);
+
+	// index buffer
+	meshNode.indexCount = static_cast<DWORD>(nFaces * 3);
+	meshNode.SetIndexBit(meshNode.indexCount);
+	if (fbxNode.indexArray.size() > 0)
+		hr = CreateIndexBuffer(pd3dDevice, &meshNode.m_pIB, newIndices, static_cast<uint32_t>( nFaces * 3));
+
+	delete indecies;
+
+	delete adj;
+	delete faceRemap;
+	delete newIndices;
+	delete vertRemap;
+	return hr;
+
 }
 
 HRESULT CFBXRenderDX11::CreateVertexBuffer(  ID3D11Device*	pd3dDevice, ID3D11Buffer** pBuffer, void* pVertices, uint32_t stride, uint32_t vertexCount )
@@ -152,25 +273,6 @@ HRESULT CFBXRenderDX11::CreateIndexBuffer(  ID3D11Device*	pd3dDevice, ID3D11Buff
 	return hr;
 }
 
-HRESULT CFBXRenderDX11::Optimization(ID3D11DeviceContext*	pd3dContext, FBX_MESH_NODE& fbxNode, MESH_NODE& meshNode)
-{
-	HRESULT hr = S_OK;
-
-	if (meshNode.m_pIB==nullptr)
-		return S_OK;
-
-	uint32_t* pOutput = new uint32_t[meshNode.indexCount];
-	D3D11_MAPPED_SUBRESOURCE oRes;
-	hr = pd3dContext->Map(meshNode.m_pIB, 0, D3D11_MAP_WRITE_DISCARD, 0, &oRes);
-	if (FAILED(hr))
-		return hr;
-	DirectX::OptimizeVertices(static_cast<uint32_t*>(&fbxNode.indexArray[0]), meshNode.indexCount / 3, meshNode.vertexCount, pOutput);
-
-	memcpy(oRes.pData, pOutput, sizeof(uint32_t)*meshNode.indexCount);
-	pd3dContext->Unmap(meshNode.m_pIB, 0);
-
-	return hr;
-}
 
 HRESULT CFBXRenderDX11::VertexConstruction(ID3D11Device*	pd3dDevice, FBX_MESH_NODE &fbxNode, MESH_NODE& meshNode)
 {
